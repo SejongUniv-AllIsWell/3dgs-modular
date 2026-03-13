@@ -1,1 +1,1 @@
-# Capstone
+# 3DGS-Modular-DigitalTwin
