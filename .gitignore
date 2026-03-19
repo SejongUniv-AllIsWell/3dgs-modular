@@ -1,0 +1,52 @@
+# 아래의 것들은 필요하다면 구글 공유 폴더에 올리기
+
+# data
+input/
+output/
+*.jpg
+*.jpeg
+*.png
+*.ply
+*.obj
+*.splat
+*.ckpt
+*.pt
+*.pth
+*.avi
+*.mov
+*.mp4
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+build/
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# environment
+.env
+*.local
+
+# COLMAP
+*.db
+sparse/
+dense/
+
+# logs
+wandb/
+runs/
+tensorboard/
+*.log
+
+# folders
+datasets/
+output/
+checkpoints/
