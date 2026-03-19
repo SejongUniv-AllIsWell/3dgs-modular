@@ -1,1 +1,1 @@
-# 3DGS-Modular-DigitalTwin
+# 3DGS-Modular
