@@ -1,52 +1,74 @@
-# 아래의 것들은 필요하다면 구글 공유 폴더에 올리기
+# ============================================================
+# 3DGS Modular — .gitignore
+# ============================================================
 
-# data
-input/
-output/
-*.jpg
-*.jpeg
-*.png
+# --- Secrets & certificates ---
+.env
+env-deploy/
+env-local/
+nginx/certs/
+
+# --- 3D / ML data files ---
 *.ply
-*.obj
 *.splat
+*.obj
 *.ckpt
 *.pt
 *.pth
-*.avi
-*.mov
+*.jpg
+*.jpeg
+*.png
+
+# --- Video files ---
 *.mp4
+*.mov
+*.avi
+frontend/public/*.mp4
+frontend/public/*.mov
+frontend/public/*.avi
 
-# python
-__pycache__/
-*.pyc
-*.pyo
-build/
-dist/
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# environment
-.env
-*.local
-
-# COLMAP
+# --- COLMAP ---
 *.db
 sparse/
 dense/
 
-# logs
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+build/
+dist/
+
+# --- Node ---
+node_modules/
+.next/
+frontend/.next/
+
+# --- Docker volumes ---
+pgdata/
+miniodata/
+redisdata/
+rabbitmqdata/
+
+# --- Logs ---
+*.log
 wandb/
 runs/
 tensorboard/
-*.log
 
-# folders
-datasets/
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- 기타 ---
+input/
 output/
+datasets/
 checkpoints/
