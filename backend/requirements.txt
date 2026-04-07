@@ -11,3 +11,5 @@ minio
 python-multipart
 pydantic-settings
 websockets
+numpy
+plyfile

@@ -90,6 +90,14 @@ class MinioService:
             self.bucket, key, expires=timedelta(seconds=expires)
         )
 
+    def download_to_file(self, key: str, local_path: str) -> None:
+        """MinIO 오브젝트를 로컬 파일로 다운로드."""
+        self.client.fget_object(self.bucket, key, local_path)
+
+    def upload_from_file(self, key: str, local_path: str, content_type: str = "application/octet-stream") -> None:
+        """로컬 파일을 MinIO에 업로드."""
+        self.client.fput_object(self.bucket, key, local_path, content_type=content_type)
+
     def object_exists(self, key: str) -> bool:
         try:
             self.client.stat_object(self.bucket, key)

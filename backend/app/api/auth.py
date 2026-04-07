@@ -34,7 +34,11 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 @router.get("/login", response_model=LoginUrlResponse)
 async def login(request: Request):
-    """Google OAuth 로그인 URL 반환"""
+    """Google OAuth 로그인 URL 반환 (DEV_MODE면 dev-login으로 리다이렉트)"""
+    if settings.DEV_MODE:
+        base = settings.PUBLIC_BASE_URL or "http://localhost"
+        return LoginUrlResponse(url=f"{base}/api/auth/dev-login")
+
     if settings.PUBLIC_BASE_URL:
         callback_url = f"{settings.PUBLIC_BASE_URL}/api/auth/callback"
     else:
@@ -51,6 +55,42 @@ async def login(request: Request):
     }
     url = f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
     return LoginUrlResponse(url=url)
+
+
+@router.get("/dev-login")
+async def dev_login(db: AsyncSession = Depends(get_db)):
+    """DEV_MODE 전용: Google 없이 테스트 유저로 즉시 로그인"""
+    if not settings.DEV_MODE:
+        raise HTTPException(status_code=403, detail="DEV_MODE가 비활성화되어 있습니다.")
+
+    dev_google_id = "dev-test-user"
+    result = await db.execute(select(User).where(User.google_id == dev_google_id))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        user = User(
+            google_id=dev_google_id,
+            email="dev@localhost",
+            name="Dev User",
+            avatar_url=None,
+        )
+        db.add(user)
+        await db.flush()
+
+    access_token = create_access_token(str(user.id), user.role.value)
+    refresh_token = create_refresh_token()
+
+    session = Session(
+        user_id=user.id,
+        refresh_token_hash=hash_token(refresh_token),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    )
+    db.add(session)
+    await db.commit()
+
+    return RedirectResponse(
+        url=f"/login/callback?access_token={access_token}&refresh_token={refresh_token}",
+    )
 
 
 @router.get("/callback")

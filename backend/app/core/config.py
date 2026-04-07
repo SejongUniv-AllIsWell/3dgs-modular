@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
 
+    # Dev mode (bypass Google OAuth)
+    DEV_MODE: bool = False
+
     # Public URL (for OAuth redirect behind reverse proxy)
     PUBLIC_BASE_URL: str = ""
 

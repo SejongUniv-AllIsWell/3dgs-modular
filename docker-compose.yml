@@ -36,7 +36,9 @@ services:
     restart: unless-stopped
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: 3dgs-backend
     expose:
       - "8000"

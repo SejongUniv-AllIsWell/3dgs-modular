@@ -150,7 +150,8 @@ export default function DashboardPage() {
                   <th className="py-2 pr-4">저장 위치</th>
                   <th className="py-2 pr-4">상태</th>
                   <th className="py-2 pr-4">날짜</th>
-                  <th className="py-2">뷰어</th>
+                  <th className="py-2 pr-4">다듬기</th>
+                  <th className="py-2">정합</th>
                 </tr>
               </thead>
               <tbody>
@@ -166,15 +167,28 @@ export default function DashboardPage() {
                     </td>
                     <td className={`py-3 pr-4 ${statusColor[u.status]}`}>{statusLabel[u.status]}</td>
                     <td className="py-3 pr-4 text-gray-500">{new Date(u.uploaded_at).toLocaleDateString('ko-KR')}</td>
+                    <td className="py-3 pr-4">
+                      {isViewable(u.original_filename) && (
+                        <button
+                          onClick={() => router.push(`/viewer?upload_id=${u.id}&mode=refine`)}
+                          title="다듬기"
+                          className="text-gray-500 hover:text-orange-400 transition"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                          </svg>
+                        </button>
+                      )}
+                    </td>
                     <td className="py-3">
                       {isViewable(u.original_filename) && (
                         <button
-                          onClick={() => router.push(`/viewer?upload_id=${u.id}`)}
-                          title="뷰어에서 열기"
+                          onClick={() => router.push(`/viewer?upload_id=${u.id}&mode=align`)}
+                          title="정합"
                           className="text-gray-500 hover:text-blue-400 transition"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                           </svg>
                         </button>
                       )}

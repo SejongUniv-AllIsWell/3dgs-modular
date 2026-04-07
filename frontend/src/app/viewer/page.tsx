@@ -8,15 +8,21 @@ import BuildingMap from '@/components/map/BuildingMap';
 import dynamic from 'next/dynamic';
 
 const SplatViewer = dynamic(() => import('@/components/viewer/SplatViewer'), { ssr: false });
+const RefineViewer = dynamic(() => import('@/components/viewer/RefineViewer'), { ssr: false });
 
 function ViewerContent() {
   const searchParams = useSearchParams();
   const uploadId = searchParams.get('upload_id');
+  const viewMode = searchParams.get('mode');  // 'refine' | 'align' | null
 
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null);
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  // TODO: 개발 테스트용 임시 URL - 백엔드 연동 후 제거
+  const DEV_TEST_URL = process.env.NODE_ENV === 'development'
+    ? 'https://raw.githubusercontent.com/willeastcott/assets/main/biker.ply'
+    : null;
+  const [fileUrl, setFileUrl] = useState<string | null>(DEV_TEST_URL);
   const [loadingFile, setLoadingFile] = useState(false);
   const [uploadFilename, setUploadFilename] = useState<string | null>(null);
 
@@ -87,7 +93,11 @@ function ViewerContent() {
               </div>
             </div>
           ) : fileUrl ? (
-            <SplatViewer sogUrl={fileUrl} mode="readonly" />
+            viewMode === 'refine' ? (
+              <RefineViewer sogUrl={fileUrl} uploadId={uploadId ?? undefined} />
+            ) : (
+              <SplatViewer sogUrl={fileUrl} mode={viewMode === 'align' ? 'edit' : 'readonly'} />
+            )
           ) : (
             <div className="flex items-center justify-center h-full text-gray-600">
               <p className="text-sm">파일을 불러올 수 없습니다.</p>

@@ -12,6 +12,7 @@ from app.api.ws import router as ws_router
 from app.api.notifications import router as notifications_router
 from app.api.basemaps import router as basemaps_router
 from app.api.buildings import router as buildings_router
+from app.api.refine import router as refine_router
 
 
 from app.core.config import get_settings
@@ -61,6 +62,7 @@ app.include_router(ws_router)
 app.include_router(notifications_router)
 app.include_router(basemaps_router)
 app.include_router(buildings_router)
+app.include_router(refine_router)
 
 
 @app.get("/health")
