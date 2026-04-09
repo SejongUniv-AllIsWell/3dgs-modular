@@ -15,6 +15,14 @@ export interface SplatData {
   colorTexture: any;
   origColorData: Uint16Array | null;   // half-float RGBA
   splatEntity: any;
+  /** transformA 텍스처 (위치+회전xy GPU 데이터) */
+  transformATexture: any;
+  /** transformB 텍스처 (스케일+회전z GPU 데이터) */
+  transformBTexture: any;
+  /** GSplatResource (centers, sorter 접근용) */
+  resource: any;
+  /** gsplatData (rot_0~3 등 속성 접근용) */
+  gsplatData: any;
 }
 
 export interface SplatViewerCoreRef {
@@ -23,6 +31,7 @@ export interface SplatViewerCoreRef {
   getCanvas: () => HTMLCanvasElement | null;
   getContainer: () => HTMLDivElement | null;
   getSplatData: () => SplatData | null;
+  getPC: () => any | null;
   float2Half: (v: number) => number;
   half2Float: (h: number) => number;
   /** PlayCanvas update loop에 콜백 등록. 해제 함수 반환 */
@@ -80,6 +89,7 @@ const SplatViewerCore = forwardRef<SplatViewerCoreRef, SplatViewerCoreProps>(
       getCanvas: () => canvasRef.current,
       getContainer: () => containerRef.current,
       getSplatData: () => splatDataRef.current,
+      getPC: () => pcRef.current,
       float2Half: (v: number) => float2HalfRef.current(v),
       half2Float: _half2Float,
       onUpdate: (cb: (dt: number) => void) => {
@@ -128,7 +138,7 @@ const SplatViewerCore = forwardRef<SplatViewerCoreRef, SplatViewerCoreProps>(
             graphicsDeviceOptions: { antialias: false },
           });
           appRef.current = app;
-          app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
+          app.setCanvasFillMode(pc.FILLMODE_NONE);
           app.setCanvasResolution(pc.RESOLUTION_AUTO);
 
           // ── 카메라 ──
@@ -398,12 +408,19 @@ const SplatViewerCore = forwardRef<SplatViewerCoreRef, SplatViewerCoreProps>(
                 }
               }
 
+              const transformATex = resource?.streams?.textures?.get('transformA') ?? null;
+              const transformBTex = resource?.streams?.textures?.get('transformB') ?? null;
+
               const data: SplatData = {
                 numSplats: n,
                 posX, posY, posZ,
                 colorTexture: colorTex,
                 origColorData,
                 splatEntity,
+                transformATexture: transformATex,
+                transformBTexture: transformBTex,
+                resource,
+                gsplatData,
               };
               splatDataRef.current = data;
               onSplatLoaded?.(data);
@@ -416,7 +433,12 @@ const SplatViewerCore = forwardRef<SplatViewerCoreRef, SplatViewerCoreProps>(
           app.start();
 
           const ro = new ResizeObserver(() => {
-            if (!destroyed && app) app.resizeCanvas();
+            if (!destroyed && app && containerRef.current) {
+              const { clientWidth, clientHeight } = containerRef.current;
+              canvas.width = clientWidth * window.devicePixelRatio;
+              canvas.height = clientHeight * window.devicePixelRatio;
+              app.resizeCanvas();
+            }
           });
           ro.observe(containerRef.current!);
           const origDestroy = app.destroy.bind(app);

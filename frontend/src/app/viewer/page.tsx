@@ -27,17 +27,29 @@ function ViewerContent() {
   const [uploadFilename, setUploadFilename] = useState<string | null>(null);
 
   // upload_id가 있으면 해당 파일을 바로 로드
+  // 정합(align) 모드면 refined 버전을 우선 요청
   useEffect(() => {
     if (!uploadId) return;
     setLoadingFile(true);
-    api.get<{ url: string; filename: string }>(`/uploads/${uploadId}/presigned-url`)
+    const variant = viewMode === 'align' ? 'refined' : '';
+    const qs = variant ? `?variant=${variant}` : '';
+    api.get<{ url: string; filename: string }>(`/uploads/${uploadId}/presigned-url${qs}`)
       .then(data => {
         setFileUrl(data.url);
-        setUploadFilename(data.filename);
+        // variant가 있으면 파일명에 반영
+        const name = data.filename ?? '';
+        if (variant && name && !name.includes(variant)) {
+          const dotIdx = name.lastIndexOf('.');
+          const base = dotIdx >= 0 ? name.slice(0, dotIdx) : name;
+          const ext = dotIdx >= 0 ? name.slice(dotIdx) : '';
+          setUploadFilename(`${base}_${variant}${ext}`);
+        } else {
+          setUploadFilename(name);
+        }
       })
       .catch(() => setFileUrl(null))
       .finally(() => setLoadingFile(false));
-  }, [uploadId]);
+  }, [uploadId, viewMode]);
 
   useEffect(() => {
     if (uploadId) return; // upload_id 모드면 씬 목록 불필요

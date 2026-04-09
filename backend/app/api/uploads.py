@@ -229,10 +229,14 @@ VIEWABLE_EXTENSIONS = {".ply", ".splat", ".sog"}
 @router.get("/{upload_id}/presigned-url")
 async def get_upload_presigned_url(
     upload_id: UUID,
+    variant: str | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """ply/splat/sog 업로드 파일의 presigned 다운로드 URL 반환"""
+    """ply/splat/sog 업로드 파일의 presigned 다운로드 URL 반환.
+
+    variant=refined 이면 정제된 파일이 존재할 경우 그것을 반환한다.
+    """
     result = await db.execute(
         select(Upload).where(Upload.id == upload_id, Upload.user_id == user.id)
     )
@@ -246,5 +250,14 @@ async def get_upload_presigned_url(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="뷰어를 지원하지 않는 파일 형식입니다.")
 
     minio = get_minio_service()
+
+    # refined 버전 요청 시, 스토리지에 정제 파일이 있으면 그것을 반환
+    if variant == "refined":
+        base_dir = os.path.dirname(upload.minio_path)
+        refined_key = f"{base_dir}/refined/{upload.id}_refined.ply"
+        if minio.object_exists(refined_key):
+            url = minio.get_presigned_download_url(refined_key)
+            return {"url": url, "filename": upload.original_filename, "variant": "refined"}
+
     url = minio.get_presigned_download_url(upload.minio_path)
-    return {"url": url, "filename": upload.original_filename}
+    return {"url": url, "filename": upload.original_filename, "variant": "original"}

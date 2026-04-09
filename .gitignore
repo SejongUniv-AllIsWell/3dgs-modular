@@ -8,6 +8,7 @@ env-deploy/
 env-local/
 nginx/certs/
 env.local
+*.env.local
 
 # --- 3D / ML data files ---
 *.ply

@@ -140,6 +140,60 @@ export function useGaussianSelector(
     onSelectionDone(indices);
   }, [onSelectionDone]);
 
+  /** 인덱스 배열을 .idx 파일로 다운로드 */
+  const saveIndices = useCallback(() => {
+    const sel = selectionRef.current;
+    if (!sel) return;
+    const indices: number[] = [];
+    for (let i = 0; i < sel.selected.length; i++) {
+      if (sel.selected[i]) indices.push(i);
+    }
+    if (indices.length === 0) return;
+
+    const header = `# splat_count=${sel.selected.length}\n`;
+    const content = header + indices.join('\n') + '\n';
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `selection_${indices.length}.idx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  /** .idx 파일에서 인덱스를 불러와 선택 적용 */
+  const loadIndices = useCallback(() => {
+    const sel = selectionRef.current;
+    if (!sel) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.idx,.txt';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = reader.result as string;
+        pushHistory();
+        sel.selected.fill(0);
+
+        const lines = text.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) continue;
+          const idx = parseInt(trimmed, 10);
+          if (!isNaN(idx) && idx >= 0 && idx < sel.selected.length) {
+            sel.selected[idx] = 1;
+          }
+        }
+        refreshHighlight();
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }, [pushHistory, refreshHighlight]);
+
   // ── onSplatLoaded: 코어에 전달할 콜백 ──
   const onSplatLoaded = useCallback((data: SplatData) => {
     selectionRef.current = {
@@ -177,9 +231,9 @@ export function useGaussianSelector(
       const splatData = coreRef.current?.getSplatData();
       const sel = selectionRef.current;
       const cam = cameraEntity.camera;
-      if (!splatData || !sel || !cam) return;
+      const pc = coreRef.current?.getPC();
+      if (!splatData || !sel || !cam || !pc) return;
 
-      const pc = (window as any).pc;
       const vpMat = new pc.Mat4();
       vpMat.mul2(cam.projectionMatrix, cam.viewMatrix);
       const m = vpMat.data;
@@ -204,7 +258,8 @@ export function useGaussianSelector(
 
     const pickBboxFace = (mouseX: number, mouseY: number): { axis: number; isMax: boolean } | null => {
       const cam = cameraEntity.camera!;
-      const pc = (window as any).pc;
+      const pc = coreRef.current?.getPC();
+      if (!pc) return null;
       const near = new pc.Vec3();
       const far = new pc.Vec3();
       cam.screenToWorld(mouseX, mouseY, cam.nearClip, near);
@@ -456,6 +511,16 @@ export function useGaussianSelector(
             {onSelectionDone && (
               <button onClick={doneSelection} className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded cursor-pointer">완료</button>
             )}
+          </div>
+          <div className="flex gap-1 mt-1">
+            <button onClick={saveIndices} disabled={selectionCount === 0}
+              className="flex-1 px-2 py-1 bg-teal-700 hover:bg-teal-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded cursor-pointer">
+              저장 (.idx)
+            </button>
+            <button onClick={loadIndices}
+              className="flex-1 px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white rounded cursor-pointer">
+              불러오기
+            </button>
           </div>
         </div>
       </div>
