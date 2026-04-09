@@ -1,9 +1,9 @@
 import math
 import os
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -25,6 +25,10 @@ from app.services.celery_service import dispatch_training_task
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
+# 사용자당 업로드 제한 (개수 / 총 용량)
+MAX_UPLOADS_PER_USER = 100
+MAX_STORAGE_PER_USER = 200 * 1024 * 1024 * 1024  # 200 GB
+
 
 def _module_folder(module_id: str, module_name: str) -> str:
     return f"{module_id}_{module_name}"
@@ -41,6 +45,30 @@ async def init_upload(
     db: AsyncSession = Depends(get_db),
 ):
     """Multipart 업로드 초기화 — presigned URL 반환"""
+    # 사용자당 업로드 개수 / 용량 제한 확인
+    quota_result = await db.execute(
+        select(
+            func.count(Upload.id).label("upload_count"),
+            func.coalesce(func.sum(Upload.file_size), 0).label("total_size"),
+        ).where(
+            Upload.user_id == user.id,
+            Upload.status != UploadStatus.failed,
+        )
+    )
+    quota = quota_result.one()
+    if quota.upload_count >= MAX_UPLOADS_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"업로드 개수 한도({MAX_UPLOADS_PER_USER}개)를 초과했습니다.",
+        )
+    if quota.total_size + body.file_size > MAX_STORAGE_PER_USER:
+        used_gb = quota.total_size / (1024 ** 3)
+        limit_gb = MAX_STORAGE_PER_USER / (1024 ** 3)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"저장 용량 한도({limit_gb:.0f}GB)를 초과합니다. 현재 사용량: {used_gb:.1f}GB",
+        )
+
     # 모듈 조회 및 계층 검증
     result = await db.execute(
         select(Module)
@@ -62,12 +90,14 @@ async def init_upload(
     # 업로드 서브폴더 결정
     subfolder = get_upload_subfolder(body.filename, body.ply_target or "gsplat")
 
-    # MinIO 오브젝트 키 생성
+    # MinIO 오브젝트 키 생성 — UUID 기반 (원본 파일명은 DB에만 저장)
+    ext = os.path.splitext(body.filename)[1].lower()
+    unique_name = f"{uuid4()}{ext}"
     base_path = _module_base_path(
         str(body.building_id), str(body.floor_id),
         str(body.module_id), module.name,
     )
-    minio_key = f"{base_path}/{subfolder}/{body.filename}"
+    minio_key = f"{base_path}/{subfolder}/{unique_name}"
 
     # 파트 수 계산
     part_count = max(1, math.ceil(body.file_size / PART_SIZE))
@@ -136,6 +166,14 @@ async def complete_upload(
 
     upload.status = UploadStatus.processing
 
+    # PLY alignment 파일은 학습 없이 바로 완료 처리
+    ext = os.path.splitext(upload.original_filename)[1].lower()
+    is_ply = ext == ".ply"
+    skip_training = is_ply and upload.ply_target == PlyTarget.alignment
+
+    if skip_training:
+        upload.status = UploadStatus.completed
+
     # 모듈 + 계층 정보 조회
     mod_result = await db.execute(
         select(Module)
@@ -147,10 +185,6 @@ async def complete_upload(
     floor = floor_result.scalar_one()
 
     # PLY + alignment 타겟이면 별도 처리 없이 완료
-    ext = os.path.splitext(upload.original_filename)[1].lower()
-    is_ply = ext == ".ply"
-    skip_training = is_ply and upload.ply_target == PlyTarget.alignment
-
     celery_task_id = None
     if not skip_training:
         celery_task_id = dispatch_training_task(

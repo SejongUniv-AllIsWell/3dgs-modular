@@ -15,15 +15,15 @@ from app.api.buildings import router as buildings_router
 
 
 from app.core.config import get_settings
+from app.services.minio_service import get_minio_service
 
 settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 기동 시 초기화
+    get_minio_service()  # MinIO 버킷 자동 생성
     yield
-    # 종료 시 정리
 
 
 app = FastAPI(
@@ -34,12 +34,10 @@ app = FastAPI(
 
 # CORS
 cors_origins = ["*"]
-if settings.PUBLIC_BASE_URL:
-    cors_origins = [
-        settings.PUBLIC_BASE_URL,
-        "http://localhost",
-        "http://192.168.0.51",
-    ]
+if settings.PUBLIC_BASE_URL and not settings.DEV_MODE:
+    cors_origins = [settings.PUBLIC_BASE_URL, "http://localhost"]
+    if settings.CORS_EXTRA_ORIGINS:
+        cors_origins += [o.strip() for o in settings.CORS_EXTRA_ORIGINS.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,

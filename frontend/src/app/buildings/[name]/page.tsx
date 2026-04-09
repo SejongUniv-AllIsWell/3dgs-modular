@@ -81,10 +81,11 @@ export default function BuildingDetailPage() {
       );
       setFloors(withModules);
 
-      // 첫 번째 씬 자동 선택
+      // 첫 번째 씬 자동 선택 + 해당 층 열기
       for (const floor of withModules) {
         for (const mod of floor.modules) {
           if (mod.scene) {
+            setOpenFloors(new Set([floor.id]));
             handleSceneSelect(mod.scene, mod);
             return;
           }
@@ -94,6 +95,19 @@ export default function BuildingDetailPage() {
   }, [buildingId, handleSceneSelect]);
 
   const totalScenes = floors.reduce((sum, f) => sum + f.modules.filter(m => m.scene).length, 0);
+
+  // 지상 내림차순 → 지하 내림차순 정렬
+  const sortedFloors = [...floors].sort((a, b) => b.floor_number - a.floor_number);
+
+  const floorLabel = (n: number) => n >= 0 ? `${n}층` : `B${Math.abs(n)}`;
+
+  const [openFloors, setOpenFloors] = useState<Set<string>>(new Set());
+  const toggleFloor = (id: string) =>
+    setOpenFloors(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   if (loading) return null;
 
@@ -140,52 +154,64 @@ export default function BuildingDetailPage() {
               <p className="text-sm">씬 데이터가 없습니다</p>
             </div>
           ) : (
-            <div className="p-2 space-y-3">
-              {floors.map(floor => (
-                <div key={floor.id}>
-                  <p className="text-xs font-semibold text-gray-500 uppercase px-2 pb-1">
-                    {floor.floor_number}층
-                  </p>
-                  <div className="space-y-1">
-                    {floor.modules.map(mod => (
-                      <button
-                        key={mod.id}
-                        onClick={() => mod.scene && handleSceneSelect(mod.scene, mod)}
-                        disabled={!mod.scene}
-                        className={`w-full text-left px-3 py-3 rounded-lg text-sm transition ${
-                          selectedModule?.id === mod.id
-                            ? 'bg-blue-600/20 text-blue-300 border border-blue-600/40'
-                            : mod.scene
-                              ? 'text-gray-300 hover:bg-gray-800 border border-transparent'
-                              : 'text-gray-600 border border-transparent cursor-default'
-                        }`}
+            <div className="p-2 space-y-1">
+              {sortedFloors.map(floor => {
+                const isOpen = openFloors.has(floor.id);
+                const hasSelected = floor.modules.some(m => m.id === selectedModule?.id);
+                return (
+                  <div key={floor.id}>
+                    <button
+                      onClick={() => toggleFloor(floor.id)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                        hasSelected ? 'text-blue-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                      }`}
+                    >
+                      <span>{floorLabel(floor.floor_number)}</span>
+                      <svg
+                        className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium truncate">{mod.name}</span>
-                          {mod.scene?.is_aligned && (
-                            <span className="text-xs text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full ml-2 shrink-0">
-                              정합완료
-                            </span>
-                          )}
-                          {!mod.scene && (
-                            <span className="text-xs text-gray-600 ml-2 shrink-0">씬 없음</span>
-                          )}
-                        </div>
-                        {mod.scene && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            {new Date(mod.scene.created_at).toLocaleDateString('ko-KR', {
-                              year: 'numeric', month: 'long', day: 'numeric',
-                            })}
-                          </p>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {isOpen && (
+                      <div className="mt-1 mb-1 ml-2 space-y-1">
+                        {floor.modules.map(mod => (
+                          <button
+                            key={mod.id}
+                            onClick={() => mod.scene && handleSceneSelect(mod.scene, mod)}
+                            disabled={!mod.scene}
+                            className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition ${
+                              selectedModule?.id === mod.id
+                                ? 'bg-blue-600/20 text-blue-300 border border-blue-600/40'
+                                : mod.scene
+                                  ? 'text-gray-300 hover:bg-gray-800 border border-transparent'
+                                  : 'text-gray-600 border border-transparent cursor-default'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium truncate">{mod.name}</span>
+                              {!mod.scene && (
+                                <span className="text-xs text-gray-600 ml-2 shrink-0">씬 없음</span>
+                              )}
+                            </div>
+                            {mod.scene && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                {new Date(mod.scene.created_at).toLocaleDateString('ko-KR', {
+                                  year: 'numeric', month: 'long', day: 'numeric',
+                                })}
+                              </p>
+                            )}
+                          </button>
+                        ))}
+                        {floor.modules.length === 0 && (
+                          <p className="text-xs text-gray-600 px-3 py-2">모듈 없음</p>
                         )}
-                      </button>
-                    ))}
-                    {floor.modules.length === 0 && (
-                      <p className="text-xs text-gray-600 px-3 py-2">모듈 없음</p>
+                      </div>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

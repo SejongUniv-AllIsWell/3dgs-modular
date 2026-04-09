@@ -29,6 +29,22 @@ class ApiClient {
     return this.accessToken;
   }
 
+  async exchangeAuthCode(code: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/auth/exchange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      this.setTokens(data.access_token, data.refresh_token);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async refreshAccessToken(): Promise<boolean> {
     if (!this.refreshToken) return false;
     try {

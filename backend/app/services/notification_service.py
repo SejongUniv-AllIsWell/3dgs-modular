@@ -55,28 +55,28 @@ class NotificationService:
         })
 
     async def notify_task_complete(self, user_id: str, task_id: str, message: str):
-        """태스크 완료 알림"""
-        # WebSocket
-        await manager.send_to_user(user_id, {
+        """태스크 완료 알림 — WebSocket 전송 실패 시 DB에 저장"""
+        sent = await manager.send_to_user(user_id, {
             "type": "task_complete",
             "task_id": task_id,
             "message": message,
         })
-        # DB에도 저장 (미접속 대비)
-        await self._save_to_db(
-            user_id, message, NotificationType.task_complete, task_id,
-        )
+        if not sent:
+            await self._save_to_db(
+                user_id, message, NotificationType.task_complete, task_id,
+            )
 
     async def notify_task_failed(self, user_id: str, task_id: str, message: str):
-        """태스크 실패 알림"""
-        await manager.send_to_user(user_id, {
+        """태스크 실패 알림 — WebSocket 전송 실패 시 DB에 저장"""
+        sent = await manager.send_to_user(user_id, {
             "type": "task_failed",
             "task_id": task_id,
             "message": message,
         })
-        await self._save_to_db(
-            user_id, message, NotificationType.task_failed, task_id,
-        )
+        if not sent:
+            await self._save_to_db(
+                user_id, message, NotificationType.task_failed, task_id,
+            )
 
     async def get_unread(self, user_id: str, db: AsyncSession) -> list[Notification]:
         """읽지 않은 알림 목록"""
@@ -96,6 +96,7 @@ class NotificationService:
         notification = result.scalar_one_or_none()
         if notification:
             notification.is_read = True
+            await db.commit()
             return True
         return False
 
@@ -107,6 +108,7 @@ class NotificationService:
         )
         for notification in result.scalars().all():
             notification.is_read = True
+        await db.commit()
 
     async def _save_to_db(
         self,

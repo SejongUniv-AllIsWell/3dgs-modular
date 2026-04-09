@@ -46,7 +46,7 @@ services:
       - REDIS_HOST=redis
       - RABBITMQ_HOST=rabbitmq
       - MINIO_ENDPOINT=minio:9000
-      - MINIO_PUBLIC_ENDPOINT=${MINIO_PUBLIC_ENDPOINT:-192.168.0.51:9000}
+      - MINIO_PUBLIC_ENDPOINT=${MINIO_PUBLIC_ENDPOINT:-localhost:9000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,7 +64,7 @@ services:
     image: postgres:16-alpine
     container_name: 3dgs-postgres
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # Local access only(GPU worker does not need direct access)
     volumes:
       - pgdata:/var/lib/postgresql/data
     environment:
@@ -84,7 +84,7 @@ services:
     image: redis:7-alpine
     container_name: 3dgs-redis
     ports:
-      - "6379:6379"
+      - "${PC_HOST_IP}:6379:6379"   # GPU worker access — bind to PC's LAN IP only
     volumes:
       - redisdata:/data
     command: redis-server --requirepass ${REDIS_PASSWORD}
@@ -101,8 +101,8 @@ services:
     image: rabbitmq:3-management-alpine
     container_name: 3dgs-rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "${PC_HOST_IP}:5673:5672"   # GPU worker access — bind to PC's LAN IP only
+      - "127.0.0.1:15673:15672"     # Management UI is local allowed only
     volumes:
       - rabbitmqdata:/var/lib/rabbitmq
     environment:
@@ -121,8 +121,8 @@ services:
     image: minio/minio
     container_name: 3dgs-minio
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${PC_HOST_IP}:9000:9000"   # GPU worker access — bind to PC's LAN IP only
+      - "127.0.0.1:9001:9001"       # Management UI is local allowed only
     volumes:
       - miniodata:/data
     environment:

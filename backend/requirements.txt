@@ -10,4 +10,3 @@ redis
 minio
 python-multipart
 pydantic-settings
-websockets

@@ -41,6 +41,11 @@ class MinioService:
     def ensure_bucket(self):
         if not self.client.bucket_exists(self.bucket):
             self.client.make_bucket(self.bucket)
+        # 버킷을 명시적으로 private으로 유지: 기존 public 정책이 있으면 제거
+        try:
+            self.client.delete_bucket_policy(self.bucket)
+        except Exception:
+            pass  # 설정된 정책이 없으면 무시 (기본 private)
 
     def init_multipart_upload(self, key: str, content_type: str) -> str:
         return self.client._create_multipart_upload(
@@ -98,7 +103,12 @@ class MinioService:
             return False
 
 
+_minio_service: MinioService | None = None
+
+
 def get_minio_service() -> MinioService:
-    service = MinioService()
-    service.ensure_bucket()
-    return service
+    global _minio_service
+    if _minio_service is None:
+        _minio_service = MinioService()
+        _minio_service.ensure_bucket()
+    return _minio_service

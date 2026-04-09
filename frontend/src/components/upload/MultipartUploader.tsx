@@ -11,6 +11,22 @@ function isPlyFile(filename: string): boolean {
   return PLY_EXTENSIONS.includes(`.${ext}`);
 }
 
+// 브라우저가 file.type을 빈 문자열로 반환할 때 확장자 기반 보완
+const EXT_TO_MIME: Record<string, string> = {
+  mp4: 'video/mp4', mov: 'video/quicktime', avi: 'video/x-msvideo',
+  mkv: 'video/x-matroska', webm: 'video/webm',
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+  gif: 'image/gif', bmp: 'image/bmp', webp: 'image/webp',
+  ply: 'application/octet-stream', splat: 'application/octet-stream',
+  sog: 'application/octet-stream',
+};
+
+function resolveContentType(file: File): string {
+  if (file.type) return file.type;
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return EXT_TO_MIME[ext] ?? 'application/octet-stream';
+}
+
 // "1","2" → 1,2 / "B1","B2" → -1,-2 / invalid → null
 function parseFloorToInt(value: string): number | null {
   const v = value.trim().toUpperCase();
@@ -212,7 +228,7 @@ export default function MultipartUploader() {
       const initRes = await api.post<UploadInitResponse>('/uploads/init', {
         filename: file.name,
         file_size: file.size,
-        content_type: file.type || 'application/octet-stream',
+        content_type: resolveContentType(file),
         building_id: buildingId,
         floor_id: floorId,
         module_id: moduleId,

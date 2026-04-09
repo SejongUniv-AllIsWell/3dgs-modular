@@ -75,7 +75,8 @@ export default function SplatViewer({ sogUrl, mode, onDoorPositionSet }: SplatVi
           prevX = e.clientX;
           prevY = e.clientY;
         });
-        window.addEventListener('mouseup', () => { dragging = false; });
+        const onMouseUp = () => { dragging = false; };
+        window.addEventListener('mouseup', onMouseUp);
         canvas.addEventListener('mousemove', (e) => {
           if (!dragging) return;
           azimuth -= (e.clientX - prevX) * 0.35;
@@ -174,6 +175,7 @@ export default function SplatViewer({ sogUrl, mode, onDoorPositionSet }: SplatVi
         const origDestroy = app.destroy.bind(app);
         app.destroy = () => {
           resizeObserver.disconnect();
+          window.removeEventListener('mouseup', onMouseUp);
           origDestroy();
         };
 

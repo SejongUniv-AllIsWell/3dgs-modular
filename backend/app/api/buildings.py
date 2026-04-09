@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_current_user_optional
 from app.models import User, Building, Floor, Module, SceneOutput
 
 router = APIRouter(tags=["buildings"])
@@ -81,7 +81,7 @@ class ModuleResponse(BaseModel):
 @router.get("/buildings", response_model=list[BuildingResponse])
 async def list_buildings(
     has_output: bool = Query(False),
-    _: User = Depends(get_current_user),
+    _: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Building).order_by(Building.name)

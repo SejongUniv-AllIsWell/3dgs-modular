@@ -1,74 +1,50 @@
-# ============================================================
-# 3DGS Modular — .gitignore
-# ============================================================
-
-# --- Secrets & certificates ---
-.env
-env-deploy/
-env-local/
+# Secrets & certificates — NEVER upload
 nginx/certs/
+nginx/nginx.conf
 
-# --- 3D / ML data files ---
-*.ply
-*.splat
-*.obj
-*.ckpt
-*.pt
-*.pth
-*.jpg
-*.jpeg
-*.png
-
-# --- Video files ---
-*.mp4
-*.mov
-*.avi
+# Large binary test files
 frontend/public/*.mp4
 frontend/public/*.mov
 frontend/public/*.avi
 
-# --- COLMAP ---
-*.db
-sparse/
-dense/
+# only for local development, not for production deployment
+.claude/
+docs/
+!README.md
+*.sql
 
-# --- Python ---
+# Backup / draft files
+**/old_*.py
+.gitkeep
+**/.gitkeep
+
+# Environment
+.env
+!.env.example
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
 .venv/
-build/
-dist/
 
-# --- Node ---
+# Node
 node_modules/
 .next/
 frontend/.next/
 
-# --- Docker volumes ---
+# Docker volumes (local)
 pgdata/
 miniodata/
 redisdata/
 rabbitmqdata/
 
-# --- Logs ---
-*.log
-wandb/
-runs/
-tensorboard/
-
-# --- IDE ---
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# --- OS ---
+# OS
 .DS_Store
 Thumbs.db
-
-# --- 기타 ---
-input/
-output/
-datasets/
-checkpoints/

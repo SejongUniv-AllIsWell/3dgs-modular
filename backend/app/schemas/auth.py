@@ -15,6 +15,10 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class AuthCodeExchangeRequest(BaseModel):
+    code: str
+
+
 class AccessTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

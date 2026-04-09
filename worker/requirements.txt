@@ -1,5 +1,3 @@
 celery
 redis
 minio
-numpy
-opencv-python-headless

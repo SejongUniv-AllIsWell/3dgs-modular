@@ -1,19 +1,163 @@
-3dgs학습 결과물들을 합쳐서 크라우드소싱 방식으로 서울의 실내 디지털트윈을 구축하는 것이 목표다.
+# CLAUDE.md — 3DGS Digital Twin Platform
 
-명세서 
-- 웹 기반, (디지털 트윈 분야의 위키피디아 같은) 모듈형 디지털트윈 구축 서비스이다.
-    - basemap: 디지털트윈 공간의 뼈대를 이루는 공간 (복도 등)
-    - module: basemap에 부착시킬 모듈 (방 등)
-- 사용자는 구글계정을 이용해 로그인을 한다.
-- 3dgs 학습: ply파일 또는 영상(이미지 또는 동영상) 업로드를 하면 gs학습이 학습서버에서 이루어진다.
-    - 정졔: 학습 후, module의 경계면(벽이나 문)에 방 경계면 외부에 있는 가우시안들을 전부 투영시키거나 삭제하고, 가우시안의 방향을 벽과 나란하게 정렬시켜서 방 외부에 floater를 없애고, module의 경계면을 매끈하게 만든다. 이렇게 방 외부의 floater를 없애야 나중에 두 공간을 합쳤을 때 시각적 품질이 저하되지 않을 것이다.
-    - 학습 & 정제 이후 경계면이 잘 정제된 고품질 3dgs 파일 (.ply)를 얻는다.
-- 사용자는 카카오맵 또는 네이버맵에서 원하는 건물을 선택한다.
-- 그 건물의 basemap에서 내가 만든 ply파일을 연결시키고 싶은 문을 선택한다.
-- 문을 이용해 두 공간을 연결시킨다. 
-    - 문을 인식하는 방법은 다음 두 방법을 고려하고 있다.
-        - 사용자가 직접 문을 이루고 있는 gs입자들을 선택하는 것
-            - 직육면체 바운딩박스로 선택하게 하는 방법
-            - 각도별로 돌려보면서 브러쉬질하는 방법 (브러쉬질 한 것의 교집합만 남기는 방식으로 하면 3차원이더라도 잘 돌려가면서 문을 이루는 gs입자들만 쉽게 골라낼 수 있지 않을까?)
-        - SAM3같은 segmentation 모델을 사용하는 것을 계획하고 있다.)
-- 두 공간 사이의 위치관계 정보를 가지고 있는 행렬을 저장해두었다가, 나중에 또 사용자가 그 문을 열면 그 공간의 ply파일을 업로드하고 행렬변환을 적용하여 display하여 두 공간을 연결시키고, 디지털트윈처럼 동작하도록 한다.
+## Overview
+
+A web platform that creates digital twins of building interiors using 3D Gaussian Splatting.
+Video upload → GPU server 3DGS training → door-based alignment → web viewer serving.
+## Web page
+https://splat.wiki/
+
+## Tech Stack
+
+| Role | Technology |
+|------|-----------|
+| Frontend | Next.js (App Router, TypeScript, Tailwind) |
+| Backend | FastAPI + SQLAlchemy (async) + Alembic |
+| Database | PostgreSQL |
+| Cache | Redis |
+| Storage | MinIO (S3-compatible object storage) |
+| Queue | RabbitMQ (Celery broker) |
+| GPU Worker | Celery (separate physical machine) |
+| 3DGS Viewer | PlayCanvas Engine (SOG format) |
+| Map | KakaoMap API |
+| Auth | Google OAuth 2.0 + JWT |
+| Proxy | Nginx |
+
+## Deployment
+
+```
+[PC] docker compose
+├── nginx        :80/443
+├── frontend     :3000
+├── backend      :8000
+├── postgres     :5432
+├── redis        :6379
+├── rabbitmq     :5672
+├── minio        :9000
+└── flower       :5555
+
+[GPU Server] separate machine
+└── celery worker  ← connects to PC's RabbitMQ/Redis/MinIO over network
+```
+
+## Directory Structure
+
+```
+/
+├── frontend/           # Next.js
+│   ├── src/app/        # Page routing
+│   ├── src/components/ # viewer/, map/, upload/, dashboard/
+│   ├── src/lib/        # API client, WebSocket, utilities
+│   └── src/types/
+├── backend/            # FastAPI
+│   ├── app/main.py
+│   ├── app/core/       # config, security, database
+│   ├── app/api/        # auth, uploads, tasks, scenes, basemaps, ws
+│   ├── app/models/     # SQLAlchemy ORM
+│   ├── app/schemas/    # Pydantic
+│   ├── app/services/   # minio_service, celery_service, notification_service
+│   ├── app/middleware/  # access_log
+│   └── alembic/
+├── worker/             # Celery (deployed on GPU server)
+│   ├── tasks/          # training.py, alignment.py
+│   ├── pipeline/       # base.py, ffmpeg, blur_detection, colmap, gsplat, sog_converter, runner
+│   └── celery_app.py
+├── nginx/nginx.conf
+├── docker-compose.yml
+└── .env
+```
+
+## Core Rules
+
+### Pipeline Modules
+- All modules MUST inherit `PipelineModule(ABC)` with `run(input_path) → output_path` interface
+- Inter-module communication via file paths (directories) ONLY. No direct imports between modules
+- Replacing any module MUST NOT affect adjacent modules
+- Pipeline: FFmpeg → BlurDetection → COLMAP → gsplat → SOG conversion
+
+### PlayCanvas Viewer
+- Single component, branched by `mode` prop (edit / readonly)
+- Edit mode: SOG rendering + door position selection UI
+- Readonly mode: SOG rendering + camera controls only
+
+### Authentication
+- Google OAuth → JWT (Access 30min / Refresh 7days)
+- Admin: `users.role = 'admin'` → basemap approval/modification privileges
+
+### MinIO Object Keys
+- `users/{user_id}/{building_name}/web_input/` — raw uploads (private)
+- `users/{user_id}/{building_name}/3dgs_output/` — training results (private)
+- `buildings/{building_name}/{floor}/ply|sog|metadata/` — aligned outputs (public)
+- Upload: Multipart + presigned PUT URL (client uploads directly to MinIO)
+- Download: presigned GET URL
+
+### Basemap
+- Initially created by admin, fundamentally immutable
+- On change: compute transform matrix → apply to all existing aligned modules
+
+### Notifications
+- User online: WebSocket push (Redis `ws:online:{user_id}`)
+- User offline: save to PostgreSQL `notifications` → deliver on next login
+
+### Networking
+- Inter-container communication: use docker service names (`postgres`, `redis`, etc.)
+- GPU server: connects to PC via `PC_HOST_IP` environment variable
+- External exposure: Nginx 80/443 only. RabbitMQ/Redis/MinIO allow GPU server IP only
+
+## DB Tables
+
+users, access_logs, sessions, uploads, tasks, scene_outputs, basemaps, notifications
+→ See `db_schema.md` for full schema
+
+## Environment Variables
+
+```env
+# docker compose (.env)
+POSTGRES_USER=3dgs
+POSTGRES_PASSWORD=changeme
+POSTGRES_DB=3dgs_platform
+DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+REDIS_URL=redis://redis:6379/0
+RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672//
+MINIO_ENDPOINT=minio:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=changeme
+MINIO_BUCKET=3dgs-platform
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+JWT_SECRET_KEY=...
+JWT_ALGORITHM=HS256
+NEXT_PUBLIC_API_URL=/api
+NEXT_PUBLIC_KAKAO_MAP_KEY=...
+
+# GPU Worker (.env — uses PC's external IP)
+# RABBITMQ_URL=amqp://guest:guest@<PC_IP>:5672//
+# REDIS_URL=redis://<PC_IP>:6379/0
+# MINIO_ENDPOINT=<PC_IP>:9000
+```
+
+## Pages
+
+| Path | Description | Auth |
+|------|-------------|------|
+| `/` | Landing page | None |
+| `/login` | Google login | None |
+| `/dashboard` | Upload/task list | Required |
+| `/upload` | Video upload | Required |
+| `/door-select/{scene_id}` | Door selection (edit mode) | Required |
+| `/viewer` | KakaoMap + viewer (readonly) | None |
+| `/admin/basemaps` | Basemap management | Admin |
+
+## Commands
+
+```bash
+docker-compose up -d                          # Start all services
+docker-compose up -d --build frontend backend # Rebuild
+docker-compose logs -f backend                # View logs
+docker-compose exec backend alembic upgrade head  # DB migration
+docker-compose exec backend pytest            # Backend tests
+docker-compose exec frontend npm test         # Frontend tests
+
+# GPU server
+celery -A celery_app worker -Q training,alignment -c 1
+```
